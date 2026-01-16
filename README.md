@@ -1,4 +1,6 @@
 # rkhs-recolorization
-#test
-#test2
-# test pull request
+## Purpose
+### We aim to use Reproducing Kernel Hilbert Spaces to recolor grayscale images.
+
+## PIL Image documentation
+### Find a walkthrough of the basics of the PIL Image module [here](https://example.com).
