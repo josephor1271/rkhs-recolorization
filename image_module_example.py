@@ -14,3 +14,4 @@ red, green, blue = im.split() #red is a grayscale image derived from the r value
 zeroed_band = red.point(lambda _: 0) #all 0 band, same dimensions as red
 red_merge = Image.merge("RGB", (red, zeroed_band, zeroed_band)) #take red to RGB, using zeros for G, B
 red_merge.save("example_images/red_only_floral_pattern.jpg")
+
