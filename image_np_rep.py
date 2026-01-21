@@ -36,6 +36,18 @@ def gray_image_to_array(im:Image.Image, dtype=np.uint8) -> np.ndarray:
     # arr shape should be (H, W)
     return arr
 
+def make_g(grayscale_array: np.ndarray):
+    """
+    get grayscale function from array
+    """
+    def g(x: tuple) -> float:
+        x1, x2 = x
+        H, W = grayscale_array.shape
+        col = min(int(np.floor(x1 * W)), W - 1)
+        row = min(int(np.floor(x2 * H)), H - 1)
+        return float(grayscale_array[row, col])
+    return g
+
 
 def normalize_image(arr: np.ndarray) -> np.ndarray:
     """
