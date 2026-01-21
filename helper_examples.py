@@ -31,7 +31,9 @@ import pixel_sampling
 im = Image.open("dataset/starry_night.jpg")
 im_as_nparr = image_np_rep.rgb_image_to_array(im)
 g_im_as_nparr = image_np_rep.gray_image_to_array(im)       # (H,W)   uint8
+g = image_np_rep.make_g(g_im_as_nparr)
 
+print(g((0.1, 0.1)))
 # grayscale -> "grayscale RGB" by stacking channels
 g_rgb = np.stack([g_im_as_nparr, g_im_as_nparr, g_im_as_nparr], axis=2)  # (H,W,3)
 
