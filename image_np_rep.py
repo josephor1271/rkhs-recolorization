@@ -38,7 +38,7 @@ def gray_image_to_array(im: Image.Image, dtype=np.uint8) -> np.ndarray:
     return arr
 
 
-def normalize_image(arr: np.ndarray) -> np.ndarray:
+def normalize_arr(arr: np.ndarray) -> np.ndarray:
     """
     Convert uint8-like arrays to float32 in [0,1].
     Works for (H,W), (H,W,3), (H,W,4).
@@ -50,7 +50,7 @@ def normalize_image(arr: np.ndarray) -> np.ndarray:
     return arr.astype(np.float32) / 255.0
 
 
-def revert_image(arr: np.ndarray) -> np.ndarray:
+def denormalize_arr(arr: np.ndarray) -> np.ndarray:
     """
     Convert float array (expected [0,1]) to uint8 safely.
     """

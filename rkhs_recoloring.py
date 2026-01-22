@@ -157,5 +157,222 @@ def make_vector_valued_K(k, *, dim: int = 3, dtype=float):
     return K
 
 
-if __name__ == "__main__": 
-    pass
+def mask_to_D(
+    mask: np.ndarray, *, ordering="row-major", rng=None, as_set: bool = False
+):
+    """
+    Convert a (H,W) boolean mask into normalized coordinates in [0,1)^2.
+
+    Convention (matches your examples):
+      - pixel (row=0,col=0) -> (0.0, 0.0)
+      - pixel (row=H-1,col=W-1) -> ((W-1)/W, (H-1)/H)
+        e.g. 100x100 -> (0.99, 0.99)
+
+    Returns:
+      - If as_set=False: np.ndarray of shape (m,2) with rows [x1, x2] = [col/W, row/H]
+      - If as_set=True:  set of (x1,x2) tuples (order lost)
+    """
+    mask = np.asarray(mask, dtype=bool)
+    if mask.ndim != 2:
+        raise ValueError(f"mask must be 2D (H,W), got {mask.shape}")
+
+    H, W = mask.shape
+    rows, cols = np.nonzero(mask)  # already row-major sorted by row, then col
+
+    if ordering == "col-major":
+        order = np.lexsort((rows, cols))  # sort by col then row
+        rows, cols = rows[order], cols[order]
+    elif ordering == "random":
+        rng = np.random.default_rng(rng)
+        perm = rng.permutation(rows.size)
+        rows, cols = rows[perm], cols[perm]
+    elif ordering != "row-major":
+        raise ValueError("ordering must be 'row-major', 'col-major', or 'random'")
+
+    x1 = cols.astype(np.float32) / float(W)  # col/W
+    x2 = rows.astype(np.float32) / float(H)  # row/H
+
+    coords = np.stack([x1, x2], axis=1)  # (m,2)
+
+    if as_set:
+        return set(map(tuple, coords.tolist()))
+    return coords
+
+
+def omega_coords(H: int, W: int, *, dtype=np.float32) -> np.ndarray:
+    """
+    Return all Ω coordinates for an HxW image in row-major order.
+    Bin convention:
+      (row=r, col=c) -> (x1, x2) = (c/W, r/H)
+    Output shape: (H*W, 2) with rows [x1, x2].
+    """
+    H = int(H)
+    W = int(W)
+    if H <= 0 or W <= 0:
+        raise ValueError("H and W must be positive")
+
+    rr, cc = np.indices((H, W))
+    x1 = (cc.astype(dtype) / W).ravel()  # col/W
+    x2 = (rr.astype(dtype) / H).ravel()  # row/H
+    return np.stack([x1, x2], axis=1)
+
+
+def kernel_gram_matrix(k, D: np.ndarray, *, dtype=np.float64) -> np.ndarray:
+    """
+    Compute K_D where (K_D)[i,j] = k(D[i], D[j]) for D ⊂ Ω.
+
+    Args:
+      k: scalar kernel function k(x,y) -> float
+      D: (m,2) array of normalized coordinates in [0,1)^2
+      symmetric: if True, fill only upper triangle and mirror (assumes k(x,y)=k(y,x))
+      dtype: dtype of returned matrix
+
+    Returns:
+      K_D: (m,m) numpy array
+    """
+    D = np.asarray(D, dtype=np.float64)
+    if D.ndim != 2 or D.shape[1] != 2:
+        raise ValueError(f"D must have shape (m,2), got {D.shape}")
+
+    m = D.shape[0]
+    K = np.empty((m, m), dtype=dtype)
+    print(f"K_D matrix is {m} x {m} size, {m*m} entries")
+
+    for i in range(m):
+        xi = (float(D[i, 0]), float(D[i, 1]))
+        K[i, i] = k(xi, xi)
+        for j in range(i + 1, m):
+            xj = (float(D[j, 0]), float(D[j, 1]))
+            kij = k(xi, xj)
+            K[i, j] = kij
+            K[j, i] = kij
+
+    return K
+
+
+def kernel_cross_matrix_Omega_D(
+    k,
+    D: np.ndarray,
+    H: int,
+    W: int,
+    *,
+    dtype=np.float64,
+) -> np.ndarray:
+    """
+    Compute K_cD of shape (N, m) where N=H*W and m=len(D).
+    Row index u corresponds to pixel (row=r, col=c) in row-major order:
+      u = r*W + c
+    and u's normalized coord is (c/W, r/H) (bin convention).
+
+    Args:
+      k: scalar kernel k(x,y) -> float
+      D: (m,2) array of normalized coordinates (same convention)
+      H, W: image height/width
+      dtype: dtype for output matrix
+
+    Returns:
+      K_cD: (H*W, m) numpy array
+    """
+    D = np.asarray(D, dtype=np.float64)
+    if D.ndim != 2 or D.shape[1] != 2:
+        raise ValueError(f"D must have shape (m,2), got {D.shape}")
+
+    H = int(H)
+    W = int(W)
+    if H <= 0 or W <= 0:
+        raise ValueError("H and W must be positive")
+
+    m = D.shape[0]
+    N = H * W
+    KcD = np.empty((N, m), dtype=dtype)
+    print(f"K_cD matrix is {N} x {m} size, {N*m} entries")
+
+    # Pre-pack D points as tuples for faster inner loop
+    D_tuples = [(float(D[i, 0]), float(D[i, 1])) for i in range(m)]
+
+    idx = 0
+    for r in range(H):
+        x2 = r / H
+        for c in range(W):
+            x1 = c / W
+            u = (x1, x2)
+            # fill row idx
+            for j, xj in enumerate(D_tuples):
+                KcD[idx, j] = k(u, xj)
+            idx += 1
+
+    return KcD
+
+
+def mask_to_rc(
+    mask: np.ndarray,
+    *,
+    ordering="row-major",
+    rng=None,
+) -> np.ndarray:
+    """
+    Return integer (row,col) coordinates of True entries in mask.
+    Output shape: (m,2) with rows [row, col]
+    """
+    mask = np.asarray(mask, dtype=bool)
+    if mask.ndim != 2:
+        raise ValueError(f"mask must be 2D (H,W), got {mask.shape}")
+
+    rows, cols = np.nonzero(mask)  # row-major order by default
+    if ordering == "col-major":
+        order = np.lexsort((rows, cols))  # by col then row
+        rows, cols = rows[order], cols[order]
+    elif ordering == "random":
+        rng = np.random.default_rng(rng)
+        perm = rng.permutation(rows.size)
+        rows, cols = rows[perm], cols[perm]
+    elif ordering != "row-major":
+        raise ValueError("ordering must be 'row-major', 'col-major', or 'random'")
+
+    return np.stack([rows, cols], axis=1)
+
+
+def rc_to_D(rc: np.ndarray, H: int, W: int, *, dtype=np.float32) -> np.ndarray:
+    """
+    Convert integer (row,col) -> normalized (x1,x2) in bin convention:
+      x1 = col/W, x2 = row/H
+    """
+    rc = np.asarray(rc)
+    rows = rc[:, 0].astype(dtype)
+    cols = rc[:, 1].astype(dtype)
+    x1 = cols / float(W)
+    x2 = rows / float(H)
+    return np.stack([x1, x2], axis=1)
+
+
+def sample_rgb_on_mask(
+    color_array: np.ndarray,
+    mask: np.ndarray,
+    *,
+    ordering="row-major",
+    rng=None,
+    dtype=np.float64,
+):
+    """
+    Returns:
+      D:   (m,2) normalized coords (bin convention)
+      F_D: (m,3) RGB values at those coords (same order)
+      rc:  (m,2) integer row/col (same order)
+    """
+    color_array = np.asarray(color_array)
+    mask = np.asarray(mask, dtype=bool)
+
+    if color_array.ndim != 3 or color_array.shape[2] != 3:
+        raise ValueError(f"color_array must be (H,W,3), got {color_array.shape}")
+
+    H, W, _ = color_array.shape
+    if mask.shape != (H, W):
+        raise ValueError(f"mask must be shape {(H,W)}, got {mask.shape}")
+
+    rc = mask_to_rc(mask, ordering=ordering, rng=rng)  # (m,2)
+    rows, cols = rc[:, 0], rc[:, 1]
+
+    F_D = color_array[rows, cols, :].astype(dtype, copy=False)  # (m,3)
+    D = rc_to_D(rc, H, W)
+
+    return D, F_D, rc
