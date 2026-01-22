@@ -121,6 +121,39 @@ def make_f(color_array: np.ndarray,
 
     return f
 
+def make_nonlocal_k(g, *,
+           t: float,
+           p: float = 2.0,
+           eps: float = 1e-12):
+    """
+    Build kernel k(x,y) = exp( - |g(x)-g(y)|^p / (4t) ).
+
+    Args:
+      g: function from make_g, mapping x=(x1,x2) in [0,1]^2 -> grayscale scalar
+      t: positive scale parameter (t > 0)
+      p: exponent, typically in (0, 2]
+      eps: tiny constant to avoid division by zero if t is extremely small
+
+    Returns:
+      k(x,y) as a float in (0, 1].
+    """
+    t = float(t)
+    p = float(p)
+    if t <= 0:
+        raise ValueError(f"t must be > 0, got {t}")
+    if not (0 < p <= 2):
+        raise ValueError(f"p must be in (0,2], got {p}")
+
+    denom = 4.0 * t + eps
+
+    def k(x, y) -> float:
+        gx = float(g(x))
+        gy = float(g(y))
+        diff = abs(gx - gy)
+        return float(np.exp(-(diff ** p) / denom))
+
+    return k
+
 
 
 def normalize_image(arr: np.ndarray) -> np.ndarray:
