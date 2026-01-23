@@ -1,13 +1,4 @@
-import os
 import numpy as np
-
-from PIL import Image
-
-
-"""
-We can use numpy with PIL to take images and turn them into np arrays for easier calculations.
-"""
-
 
 ############################# Main Functions #############################
 ##########################################################################
@@ -376,3 +367,81 @@ def sample_rgb_on_mask(
     D = rc_to_D(rc, H, W)
 
     return D, F_D, rc
+
+
+def solve_for_A(
+    K_D: np.ndarray,
+    F_D: np.ndarray,
+    *,
+    gamma: float = 1e-4,
+    jitter: float = 1e-10,
+) -> np.ndarray:
+    """
+    Solve (K_D + gamma*m*I) A = F_D for A, where:
+      K_D: (m,m) kernel Gram matrix on D
+      F_D: (m,3) known RGB values at points in D (ordered consistently with K_D)
+      A:   (m,3) coefficients (one column per channel)
+
+    Args:
+      gamma: regularization strength (small positive)
+      jitter: extra diagonal stabilizer
+      use_cholesky: try Cholesky solve (fast/stable if SPD); fallback to np.linalg.solve
+
+    Returns:
+      A: (m,3)
+    """
+    K_D = np.asarray(K_D, dtype=np.float64)
+    F_D = np.asarray(F_D, dtype=np.float64)
+
+    if K_D.ndim != 2 or K_D.shape[0] != K_D.shape[1]:
+        raise ValueError(f"K_D must be square (m,m), got {K_D.shape}")
+    m = K_D.shape[0]
+
+    if F_D.shape != (m, 3):
+        raise ValueError(f"F_D must have shape (m,3) with m={m}, got {F_D.shape}")
+
+    gamma = float(gamma)
+    jitter = float(jitter)
+    if gamma < 0:
+        raise ValueError(f"gamma must be >= 0, got {gamma}")
+    if jitter < 0:
+        raise ValueError(f"jitter must be >= 0, got {jitter}")
+
+    M = K_D + (gamma * m + jitter) * np.eye(m)
+
+    L = np.linalg.cholesky(M)
+    # Solve L Y = F_D, then L^T A = Y
+    Y = np.linalg.solve(L, F_D)
+    A = np.linalg.solve(L.T, Y)
+    return A
+
+
+def reconstruct_image_via_KcD(
+    K_cD: np.ndarray, A: np.ndarray, H: int, W: int, *, clip: bool = True
+) -> np.ndarray:
+    """
+    Given K_cD (H*W, m) and A (m,3), compute F_img (H,W,3).
+    Keeps values in the same scale as A (normalized if your training data was normalized).
+    """
+    K_cD = np.asarray(K_cD, dtype=np.float64)
+    A = np.asarray(A, dtype=np.float64)
+
+    H = int(H)
+    W = int(W)
+    N = H * W
+
+    if K_cD.ndim != 2:
+        raise ValueError(f"K_cD must be 2D, got {K_cD.shape}")
+    if K_cD.shape[0] != N:
+        raise ValueError(f"K_cD must have {N} rows (H*W), got {K_cD.shape[0]}")
+    m = K_cD.shape[1]
+    if A.shape != (m, 3):
+        raise ValueError(f"A must have shape (m,3) with m={m}, got {A.shape}")
+
+    F_flat = K_cD @ A  # (H*W, 3)
+    F_img = F_flat.reshape(H, W, 3)
+
+    if clip:
+        F_img = np.clip(F_img, 0.0, 1.0)
+
+    return F_img
