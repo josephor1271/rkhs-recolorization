@@ -127,6 +127,53 @@ def make_nonlocal_k(g, *, t: float, p: float = 2.0, eps: float = 1e-12):
     return k
 
 
+def make_local_k(*, t: float, p: float = 2.0, eps: float = 1e-12):
+    """
+    Build a *local/spatial* kernel:
+      k_local(x,y) = exp( - ||x - y||^p / (4t) )
+
+    x,y are normalized coords in [0,1]^2 (your bin convention domain).
+
+    Args:
+      t: positive scale parameter (t > 0)
+      p: exponent (commonly 2.0; use 1.0 for heavier tails)
+      eps: tiny constant to avoid division by zero
+
+    Returns:
+      k_local(x,y) in (0,1]
+    """
+    t = float(t)
+    p = float(p)
+    if t <= 0:
+        raise ValueError(f"t must be > 0, got {t}")
+    if not (0 < p <= 2):
+        raise ValueError(f"p must be in (0,2], got {p}")
+
+    denom = 4.0 * t + eps
+
+    def k_local(x, y) -> float:
+        x1, x2 = x
+        y1, y2 = y
+        dx = float(x1) - float(y1)
+        dy = float(x2) - float(y2)
+        dist = np.sqrt(dx * dx + dy * dy)  # ||x-y||
+        return float(np.exp(-(dist**p) / denom))
+
+    return k_local
+
+
+def combine_kernels(k1, k2):
+    """
+    Return the product kernel:
+      k(x,y) = k1(x,y) * k2(x,y)
+    """
+
+    def k(x, y) -> float:
+        return float(k1(x, y) * k2(x, y))
+
+    return k
+
+
 def make_vector_valued_K(k, *, dim: int = 3, dtype=float):
     """
     Build vector-valued kernel K(x,y) = k(x,y) * I_{dim}.
@@ -385,7 +432,6 @@ def solve_for_A(
     Args:
       gamma: regularization strength (small positive)
       jitter: extra diagonal stabilizer
-      use_cholesky: try Cholesky solve (fast/stable if SPD); fallback to np.linalg.solve
 
     Returns:
       A: (m,3)
