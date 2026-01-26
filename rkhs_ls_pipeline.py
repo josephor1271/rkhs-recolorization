@@ -143,6 +143,10 @@ def mix_kernel_linwise_reg_ls(
     out_img = Image.fromarray(out, mode="RGB")
     out_img.save("samples/" + dataset_src)
 
+    out_img = np.zeros_like(im_rgb_asarr)
+    out_img[mask_arr] = im_rgb_asarr[mask_arr]
+    Image.fromarray(out_img).save("samples_black_bg/" + dataset_src)
+
     # define a local and nonlocal kernel map then combine
     # k : Omega x Omega -> R
     local_k = Rkhs.make_local_k(t=0.5, p=p)
