@@ -13,14 +13,34 @@ import rkhs_recoloring as K
 # )
 
 
+# RKHS.mix_kernel_linwise_reg_ls(
+#     "starry_night_small.jpg",
+#     num_strips=7,
+#     strip_width=(1, 1),
+#     t=0.001,
+#     p=2,
+#     gamma=0.001,
+# )
+
 RKHS.mix_kernel_linwise_reg_ls(
-    "starry_night_small.jpg",
+    "gogh_self.jpg",
     num_strips=7,
-    strip_width=(1, 1),
+    strip_width=(1, 2),
     t=0.001,
     p=2,
     gamma=0.001,
 )
+
+# RKHS.mix_kernel_linwise_reg_ls(
+#     "haring_people.jpg",
+#     num_strips=2,
+#     strip_width=(1, 1),
+#     t=0.001,
+#     p=2,
+#     gamma=0.01,
+# )
+
+
 # RKHS.nonlocal_linwise_reg_ls(
 #     "rainbow_face.jpg",
 #     num_strips=5,
