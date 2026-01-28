@@ -2,7 +2,7 @@ from PIL import Image
 import numpy as np
 import image_np_rep as Asarr
 import pixel_sampling as Pxs
-import rkhs_recoloring as Rkhs
+import evaluate_kernels as Rkhs
 
 # keep updated with functionality
 

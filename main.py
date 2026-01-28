@@ -1,5 +1,5 @@
 import rkhs_ls_pipeline as RKHS
-import rkhs_recoloring as K
+import evaluate_kernels as K
 
 # RKHS.nonlocal_linwise_reg_ls("gogh_self.jpg", num_strips=2, strip_width=(1,1), t= 0.5, p= 0.5, gamma = 0.0001)
 
@@ -23,12 +23,14 @@ import rkhs_recoloring as K
 # )
 
 RKHS.mix_kernel_linwise_reg_ls(
-    "gogh_self.jpg",
+    "starry_night_small.jpg",
     num_strips=7,
-    strip_width=(1, 2),
-    t=0.001,
-    p=2,
-    gamma=0.001,
+    strip_width=(1, 1),
+    t_local=0.02,
+    t_nonlocal=0.1,
+    p_local=2,
+    p_nonlocal=2,
+    gamma=1e-4,
 )
 
 # RKHS.mix_kernel_linwise_reg_ls(
