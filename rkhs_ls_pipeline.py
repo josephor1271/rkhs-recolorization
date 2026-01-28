@@ -2,7 +2,7 @@ from PIL import Image
 import numpy as np
 import image_np_rep as Asarr
 import pixel_sampling as Pxs
-import rkhs_recoloring as Rkhs
+import evaluate_kernels as Rkhs
 
 
 def nonlocal_pixwise_reg_ls(dataset_src: str, *, num_samples, t, p, gamma):
@@ -114,7 +114,15 @@ def nonlocal_linwise_reg_ls(dataset_src: str, *, num_strips, strip_width, t, p, 
 
 
 def mix_kernel_linwise_reg_ls(
-    dataset_src: str, *, num_strips, strip_width, t, p, gamma
+    dataset_src: str,
+    *,
+    num_strips,
+    strip_width,
+    t_local,
+    p_local,
+    t_nonlocal,
+    p_nonlocal,
+    gamma
 ):
     im = Image.open("dataset/" + dataset_src)
 
@@ -149,8 +157,8 @@ def mix_kernel_linwise_reg_ls(
 
     # define a local and nonlocal kernel map then combine
     # k : Omega x Omega -> R
-    local_k = Rkhs.make_local_k(t=0.5, p=p)
-    nonlocal_k = Rkhs.make_nonlocal_k(g, t=t, p=p)
+    local_k = Rkhs.make_local_k(t=t_local, p=p_local)
+    nonlocal_k = Rkhs.make_nonlocal_k(g, t=t_nonlocal, p=p_nonlocal)
     k = Rkhs.combine_kernels(local_k, nonlocal_k)
 
     # explicitly getting the set d so we can work on it
