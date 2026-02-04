@@ -19,3 +19,11 @@ RKHS.recolor(
     sample_function=sample_pix,
     gamma=3e-6,
 )
+
+RKHS.recolor(
+    dest="outputs/apple.jpg",
+    dataset_src="apple.jpg",
+    make_k=mixed_k,
+    sample_function=sample_pix,
+    gamma=3e-4,
+)
